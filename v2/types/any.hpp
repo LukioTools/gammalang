@@ -81,10 +81,6 @@ protected:
     }
 
 public:                 //any_e
-    
-
-
-
     any_e get_e()const{
         return _type;
     }
@@ -267,7 +263,7 @@ inline std::vector<any::any_t> any::any_map = {
     }
 };
 
-
+    //this object always contains a handle
 class Any
 {
 private:
@@ -291,6 +287,9 @@ public:
     }
     void clear(){
         handle = std::make_shared<any>();
+    }
+    bool has_value(){
+        return handle->has_value();
     }
 
     template<typename T>
