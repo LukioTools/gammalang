@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "func.hpp"
 #include <any>
 #include <array>
 #include <cstddef>
@@ -57,6 +58,7 @@ public:
         STRING,
         ARRAY,
         MAP,
+        FUNCTION,
     } _type = UNKNOWN;
     struct any_t //add custom shit :3
     {
@@ -78,7 +80,11 @@ protected:
         any_map[new_type].constructor(this, nullptr);
     }
 
-public:
+public:                 //any_e
+    
+
+
+
     any_e get_e()const{
         return _type;
     }
@@ -149,6 +155,8 @@ public:
                 return a.asr<double>() == asr<double>();
             case STRING:
                 return a.asr<string>() == asr<string>();
+            case FUNCTION:
+                return a.asr<function>() == asr<function>();
             case ARRAY:
             case MAP:
             default:
@@ -167,6 +175,8 @@ public:
                 return any(asr<array>());
             case MAP:
                 return any(asr<map>());
+            case FUNCTION:
+                return any(asr<function>());
             default:
                 return any();
         }
@@ -204,11 +214,11 @@ public:
     any(const array& arr){_data = new array(arr); _type = ARRAY;}
     any(const std::initializer_list<std::shared_ptr<any>>& arr){_data = new array(arr); _type = ARRAY;}
     any(const map& m){any_map[MAP].constructor(this, (void*) &m);}
+    any(const function& f){_data = new function(f); _type = FUNCTION;}
         //creates a copy
     any(const any& a){auto an = a.copy(); _data =  an._data; _type = an._type;}
         //moves
     any(any&& a){_data =  a._data; _type = a._type; a._data = nullptr; a._type = UNKNOWN;}
-    
 
     ~any(){
         if(!_data)
@@ -253,6 +263,7 @@ inline std::vector<any::any_t> any::any_map = {
         any_map_template(string, STRING),
         any_map_template(array, ARRAY),
         any_map_template(map, MAP),
+        any_map_template(function, FUNCTION),
     }
 };
 
@@ -304,13 +315,16 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const Any& a){
         switch (a.e_type()) {
         case any::INTEGER:
-            os << ' ' << a.as<integer>();
+            os << a.as<integer>();
             break;
         case any::DECIMAL:
-            os << ' ' << a.as<decimal>();
+            os << a.as<decimal>();
             break;
         case any::STRING:
-            os  << ' ' << a.as<string>();
+            os << a.as<string>();
+            break;
+        case any::FUNCTION:
+            os << "function: " << (void*) a.as<function>();
             break;
         case any::ARRAY:
             os << a.as<array>();
