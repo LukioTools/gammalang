@@ -107,6 +107,10 @@ public:                 //any_e
             throw std::bad_cast();
         return *reinterpret_cast<T*>(_data);
     }
+
+    template<typename T>
+    T& as() const{return asr<T>();}
+
     void* data()const{
         return _data;
     }
@@ -161,10 +165,12 @@ public:                 //any_e
     }
     any copy() const{
         switch (_type) {
-            case INTEGER:
-                return any(asr<long>());
+            case INTEGER:{
+                auto i = asr<integer>();
+                return any(i);
+            }
             case DECIMAL:
-                return any(asr<double>());
+                return any(asr<decimal>());
             case STRING:
                 return any(asr<string>());
             case ARRAY:
@@ -201,9 +207,9 @@ public:                 //any_e
         return any_map[_type].type;
     }
     any(){};
-    template<typename T, typename std::enable_if_t<std::is_integral_v<T>, bool> = 0>
+    template<typename T, typename std::enable_if_t<std::is_integral_v<T>, bool> = nullptr>
     any(T i) {_data = new long(i); _type = INTEGER;}
-    template<typename T, typename std::enable_if_t<std::is_floating_point_v<T>, bool> = 0>
+    template<typename T, typename std::enable_if_t<std::is_floating_point_v<T>, bool> = nullptr>
     any(T f) {_data = new double(f); _type = DECIMAL;}
     any(const char* str){_data = new std::string(str); _type = STRING;}
     any(const string& str){_data = new std::string(str); _type = STRING;}
@@ -264,51 +270,38 @@ inline std::vector<any::any_t> any::any_map = {
 };
 
     //this object always contains a handle
-class Any
+class Any : public std::shared_ptr<any>
 {
-private:
-    std::shared_ptr<any> handle = std::make_shared<any>();
 public:
     Any ref() const{
-        return Any{handle};
+        return Any{*this};
     }
     Any copy() const{
-        return std::make_shared<any>(handle->copy());
-    }
-    template<typename T>
-    T& as() const{
-        return handle->asr<T>();
-    }
-    any::any_t& metadata() const{
-        return handle->metadata();
-    }
-    any::any_e e_type() const{
-        return handle->_type;
-    }
-    void clear(){
-        handle = std::make_shared<any>();
-    }
-    bool has_value(){
-        return handle->has_value();
+        return std::make_shared<any>(get()->copy());
     }
 
+    any::any_t& metadata() const{
+        return get()->metadata();
+    }
+    any::any_e e_type() const{
+        return get()->_type;
+    }
+    void clear(){
+        *this = std::make_shared<any>();
+    }
+    
+    template<typename T>
+    T& as() const{
+        return get()->asr<T>();
+    }
     template<typename T>
     T* as_ptr() const{
-        return handle->asp<T>();
+        return get()->asp<T>();
     }
     template<typename T, typename std::enable_if_t<!std::is_same_v<T, Any>, bool> = nullptr>
     T& operator=(const T& o){
-        *handle = o;
-        return handle->asr<T>();
-    }
-    Any& operator=(Any&& mv){
-        handle = mv.handle;
-        mv.clear();
-        return *this;
-    }
-
-    operator std::shared_ptr<any>() const{
-        return handle;
+        this->get()->operator=(o);
+        return as<T>();
     }
 
     friend std::ostream& operator<<(std::ostream& os, const Any& a){
@@ -337,17 +330,10 @@ public:
         }
         return os;
     }
-
-    Any() {}
-    Any(const Any& p) :handle(p.handle) {}
-    Any(Any&& p) :handle(p.handle) {p.handle = nullptr;}
-    Any(std::shared_ptr<any> a) : handle(a){}
+    Any():std::shared_ptr<any>(std::make_shared<any>()){}
     template<typename T>
-    Any(T d) : handle(std::make_shared<any>(d)) {}
-    ~Any() {}
+    Any(T d) : std::shared_ptr<any>(std::make_shared<any>(d)) {}
 };
-
-
 
 
 static inline std::ostream& operator<<(std::ostream& os, const array& arr){

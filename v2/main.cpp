@@ -62,9 +62,11 @@ so that function would expand to something like so:
 int main(int argc, char const *argv[])
 {
     Any a = fn;
+    Any b;
 
     std::cout << a << std::endl;
-
+    std::cout << b->has_value() << std::endl;
+    
     a.as<function>()({});
 
     return 0;
