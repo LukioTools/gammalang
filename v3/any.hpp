@@ -56,9 +56,9 @@ public:
 
 
 
-    Any call(const string& name, array& span);
+    Any call(const string& name, array& span)const;
     template<class ...Args>
-    Any callva(const string& name, Args ...a);
+    Any callva(const string& name, Args ...a)const;
     template<class T>
     static void add_method(const string& name, function fn){
         any_methods[typeid(T).hash_code()][name] = fn;
@@ -147,6 +147,18 @@ public:
 inline std::unordered_map<std::size_t, std::unordered_map<std::string, function>> Any::any_methods({
     {
         std::make_pair(
+            typeid(void).hash_code(),
+            std::unordered_map<std::string, function>({
+            std::make_pair("=", [](const std::span<Any>& span){
+                    if(span.size() < 2)
+                        return Any(false);
+                    auto& a = span[0];
+                    auto& b = span[1];
+                    a.ptr = b.ptr;
+                    return Any(a);
+                }),
+            })),
+        std::make_pair(
             typeid(integer).hash_code(),
             std::unordered_map<std::string, function>({
                 std::make_pair("==", [](const std::span<Any>& span){
@@ -157,7 +169,13 @@ inline std::unordered_map<std::size_t, std::unordered_map<std::string, function>
                     if(a.ptr->type() != b.ptr->type() || a.ptr->type()!=typeid(integer))
                         return Any(false);
                     return Any(a.as<integer>() == b.as<integer>());
-                })
+                }),
+                std::make_pair("toString", [](const std::span<Any>& span){
+                    if(span.empty())
+                        return Any();
+                    auto& a = span[0];
+                    return Any(std::to_string(a.as<integer>()).c_str());
+                }),
             })),
         std::make_pair(
             typeid(double).hash_code(),
@@ -170,7 +188,12 @@ inline std::unordered_map<std::size_t, std::unordered_map<std::string, function>
                     if(a.ptr->type() != b.ptr->type() || a.ptr->type()!=typeid(double))
                         return Any(false);
                     return Any(a.as<double>() == b.as<double>());
-                })
+                }),
+                std::make_pair("toString", [](const std::span<Any>& span){
+                    if(span.empty())
+                        return Any();
+                    return Any(std::to_string(span[0].as<decimal>()).c_str());
+                }),
             })),
     }
 });
@@ -225,19 +248,30 @@ inline bool Any::operator==(const map& a) const{
     if(ptr->type().hash_code() == typeid(map).hash_code())
         return as<map>() == (map) a;
     return false;
-};
-inline Any Any::call(const string& name, array& args){
-    auto fn = any_methods.find(ptr->type().hash_code());
-    if(fn == any_methods.end())
-        return {};
-    auto it = fn->second.find(name);
-    if(it == fn->second.end() || !it->second)
-        return {};
+};  ///XD ITS NOT ACTUALLY CONST :333
+inline Any Any::call(const string& name, array& args)const{
+    function fn = nullptr;
+    if(any_methods.contains(ptr->type().hash_code())){
+        if(any_methods[ptr->type().hash_code()].contains(name)){
+            fn = any_methods[ptr->type().hash_code()][name];
+            goto end;
+        }
+    }
+    if(any_methods.contains(typeid(void).hash_code())){
+        if(any_methods[typeid(void).hash_code()].contains(name)){
+            fn = any_methods[typeid(void).hash_code()][name];
+            goto end;
+        }
+    }
+end:
+
+    if(!fn) return {};
+
     args.insert(args.begin(), *this);
-    return it->second(args);
+    return fn(args);
 }
 template<class ...Args>
-inline Any Any::callva(const string &name, Args ...a){
+inline Any Any::callva(const string &name, Args ...a)const{
     array arr = {Any(a)...};
     return call(name, arr);
 }
@@ -252,5 +286,9 @@ inline std::size_t Any::hash() const{
         std::hash<std::string> hasher;
         return  hasher(as<string>());
     }
+    try {
+    return callva("hash", *this).as<integer>();
+    } catch (...) {
     return ptr->type().hash_code();
+    }
 }
